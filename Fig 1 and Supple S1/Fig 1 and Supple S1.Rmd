@@ -1,0 +1,588 @@
+---
+title: "Untitled"
+output: html_document
+date: "2025-11-05"
+---
+
+```{datafiltering}
+rm(list = ls())
+
+rm(list = ls())
+
+library(ggplotify)
+library(cowplot)
+library(plotly)
+library(patchwork)
+library(ggtext)
+library(janitor)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(plyr)
+library(ggpubr)
+library(stringr)
+library(tidyr)
+library (writexl)
+library(emmeans)
+library(multcomp)
+library(lme4)
+library(car)
+library(multcompView)
+library(stats)
+library(dunn.test)
+
+data<- read.csv("/Users/sakib/Desktop/exDNA\ prevalance/Corelation/all\ data/Sakib_data2.csv")
+
+#filter out anything that has suffix _FM
+data <- data %>%
+  mutate(Source = case_when(
+    grepl("_FM$", Name) ~ "Fresh",
+    grepl("_MP$", Name) ~ "Pit",
+    TRUE ~ "Other"  # Optionally handle cases where the suffix is neither _FM nor _MP
+  ))
+
+#free, weak, tight columns introduction
+data <- data %>%
+  mutate(Type = case_when(
+    grepl("^w", Name) ~ "Weakly bound",
+    grepl("^t", Name) ~ "Tightly bound",
+    grepl("^f", Name) ~ "Free",
+    grepl("^i", Name) ~ "Intracellular",
+    TRUE ~ "Other"  # Optionally handle cases where the prefix does not match
+  ))
+
+data$log_copies <- log10(data$average.g+1)
+
+data <- data %>%
+  mutate(Location.of.DNA = if_else(Type == "Intracellular", "Intracellular", "Extracellular")) %>%
+  mutate(Location.of.DNA = case_when(
+    Location.of.DNA == "Extracellular" ~ "exDNA",
+    Location.of.DNA == "Intracellular" ~ "iDNA",
+    TRUE ~ NA_character_  # Handle missing or undefined cases
+  ))
+
+#ata.filter <- filter(data, Gene != "intl1" & Gene != "intl2" & Gene != "intl3" )
+
+data <- data %>%
+  mutate(
+    average.g = as.numeric(average.g),
+    Location.of.DNA = as.factor(Location.of.DNA),
+    log_copies = as.numeric(log_copies),
+    Gene = as.factor(Gene),
+        Type = as.factor(Type),
+    Source = as.factor(Source),
+    Name = as.factor(Name))
+
+data <- data %>%
+  mutate(Type = factor(Type, levels = c("Free","Weakly bound", "Tightly bound", "Intracellular", "Other")))
+
+data$Source_samp <- paste(data$Source, data$Samp.number, sep = "_")
+
+data$Gene_Source_samp <- paste(data$Gene, data$Source, data$Samp.number, sep = "_")
+
+data16s <- filter(data, Gene == "16s")
+dataARG <- filter(data, Gene != "16s")
+dataARG_filtered <- filter(dataARG, !(Gene %in% c("intl1", "intl2", "intl3")))
+
+dataMGE <- filter(data, Gene %in% c("intl1", "intl2", "intl3"))
+
+# Create a new dataset excluding 'intracellular' types
+dataARG_no_intracellular <- dataARG[dataARG$Type != "Intracellular", ]
+
+# Create a new dataset without intracellular entries
+data16s_no_intracellular <- data16s %>%
+  filter(Type != "Intracellular")
+
+# Step1: Combine the datasets using bind_rows
+exDNA_combined_data <- bind_rows(dataARG_no_intracellular, data16s_no_intracellular)
+
+# Step 2: Calculate relative abundance
+exDNA_combined_data_relative_abundance <- exDNA_combined_data %>%
+  group_by(Source, Location.of.DNA) %>%
+  mutate(relative_abundance = ifelse(Gene != "16s", 
+                                      average.g / average.g[Gene == "16s"], 
+                                      NA)) %>%
+  ungroup()
+
+
+# Step 4: Filter out the 16s data
+exDNA_combined_data_relative_abundance <- exDNA_combined_data_relative_abundance %>%
+  filter(Gene != "16s")
+
+data$Gene_Source_samp <- paste(data$Gene, data$Source, data$Samp.number, sep = "_")
+
+dataextra <- filter(data, Location.of.DNA == "exDNA")
+dataintra <- filter(data, Location.of.DNA == "iDNA")
+
+
+dataratio <- merge(dataextra, dataintra, by = "Gene_Source_samp", suffixes = c(".extra", ".intra"))
+
+dataratio$ratio.ei <- dataratio$average.g.extra / dataratio$average.g.intra #fix this now
+
+# Filter intl1, intl2, and intl3 into one dataset
+dataratioMGE <- filter(dataratio, Gene.extra %in% c("intl1", "intl2", "intl3"))
+
+# Filter all other genes into another dataset
+dataratioRest <- filter(dataratio, !(Gene.extra %in% c("intl1", "intl2", "intl3")))
+
+# Filter the data for 'Fresh' samples
+data_Fresh <- subset(dataARG, Source == "Fresh")
+data_Fresh_16s<- subset(data16s, Source == "Fresh")
+
+# Filter the data for 'Pit' samples
+data_Pit <- subset(dataARG, Source == "Pit")
+data_Pit_16s<- subset(data16s, Source == "Pit")
+
+#free_weak_tight_fresh
+data_Fresh_no_intracellular <- subset(data_Fresh, Type != "Intracellular")
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{Fresh manure absolute abundance}
+# For Fresh samples:
+# Calculate mean and standard deviation for Fresh samples, grouped by Gene and Location.of.DNA
+data_Fresh_summary <- data_Fresh %>%
+  group_by(Gene, Location.of.DNA) %>%
+  dplyr::summarise(mean_log_copies = mean(log_copies, na.rm = TRUE),
+            sd_log_copies = sd(log_copies, na.rm = TRUE))
+
+
+data_Fresh_summary2 <- data_Fresh %>%
+  group_by(Gene, Location.of.DNA) %>%
+  dplyr::summarise(mean_log_copies = mean(log_copies, na.rm = TRUE),
+            se_log_copies = sd(log_copies, na.rm = TRUE)/ sqrt(n())
+  )
+
+data_Fresh_summary2$Gene <- factor(data_Fresh_summary2$Gene, 
+                                   levels = c("intI1", "intI2", "intI3", "ermB", "sul1", "tet33", "tetG", "tetM", "tetX"))
+plot_Fresh <- ggplot(data_Fresh_summary2, aes(x = Gene, y = mean_log_copies, fill = Location.of.DNA)) +
+  theme_bw() +  # Apply theme_bw()
+  geom_bar(stat = "identity", position = "dodge") +  # Create bar chart with two bars per Gene
+  geom_errorbar(aes(ymin = mean_log_copies - se_log_copies, ymax = mean_log_copies + se_log_copies), 
+                width = 0.2, position = position_dodge(0.9)) +  # Add error bars for SD
+ scale_fill_manual(values = c("exDNA" = "#0072B2", "iDNA" = "#D55E00")) +  # Set exDNA to red and iDNA to green
+  labs(x = "MGEs", y = expression(log[10]~"Gene copies per g (dry weight)"),  # Y-axis label with subscript
+       title = "Absolute abundance (Fresh Manure)", fill = "DNA Type") +
+  scale_y_continuous(breaks = seq(0, 10, by = 2), limits = c(0, 10)) +  # Set Y-axis scale to 0, 2, 4, 6, 8
+  theme(panel.background = element_rect(fill = "transparent"),  # Set background color to transparent
+        panel.grid.minor = element_blank(),  # Remove minor gridlines
+        panel.grid.major = element_blank(),  # Remove major gridlines
+        axis.text.x = element_text(face = "italic"))
+
+# Print the plot for Fresh samples
+print(plot_Fresh)
+
+ggsave("plot_Fresh_NEW_absolute.png", 
+       plot = plot_Fresh, 
+       width = 7, height = 4)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{Pit manure absolute abundance}
+# For Pit samples:
+# Calculate mean and standard deviation for Pit samples, grouped by Gene and Location.of.DNA
+data_Pit_summary <- data_Pit %>%
+  group_by(Gene, Location.of.DNA) %>%
+  dplyr::summarise(mean_log_copies = mean(log_copies, na.rm = TRUE),
+            sd_log_copies = sd(log_copies, na.rm = TRUE))
+
+data_Pit_summary2 <- data_Pit %>%
+  group_by(Gene, Location.of.DNA) %>%
+  dplyr::summarise(mean_log_copies = mean(log_copies, na.rm = TRUE),
+            se_log_copies = sd(log_copies, na.rm = TRUE)/ sqrt(n())
+  )
+
+data_Pit_summary2$Gene <- factor(data_Pit_summary2$Gene, 
+                                   levels = c("intI1", "intI2", "intI3", "ermB", "sul1", "tet33", "tetG", "tetM", "tetX"))
+
+# Create the bar chart for Pit samples
+plot_Pit <- ggplot(data_Pit_summary2, aes(x = Gene, y = mean_log_copies, fill = Location.of.DNA)) +
+  theme_bw() +  # Apply theme_bw()
+  geom_bar(stat = "identity", position = "dodge") +  # Create bar chart with two bars per Gene
+  geom_errorbar(aes(ymin = mean_log_copies - se_log_copies, ymax = mean_log_copies + se_log_copies), 
+                width = 0.2, position = position_dodge(0.9)) +  # Add error bars for SD
+   scale_fill_manual(values = c("exDNA" = "#0072B2", "iDNA" = "#D55E00")) +  # Set exDNA to red and iDNA to green
+  labs(x = "MGEs and ARGs", y = "Gene copies per g (dry weight), log10", title = "Absolute abundance (Pit Manure)", fill = "DNA Type") +
+   scale_y_continuous(breaks = seq(0, 10, by = 2), limits = c(0, 10)) +  # Set Y-axis scale to 0, 2, 4, 6, 8
+  theme(panel.background = element_rect(fill = "transparent"),  # Set background color to transparent
+        panel.grid.minor = element_blank(),  # Remove minor gridlines
+        panel.grid.major = element_blank(),  # Remove major gridlines
+         axis.text.x = element_text(face = "italic"))
+
+# Print the plot for Pit samples
+print(plot_Pit)
+
+ggsave("plot_pit_NEW_absolute.png", 
+       plot = plot_Pit, 
+       width = 7, height = 4)
+```
+
+
+
+```{exDNA to iDNA ratio}
+# Filter out rows where 'Gene.intra' contains '16s'
+dataratio_filtered <- dataratio %>%
+  filter(!grepl("16s", Gene.intra, ignore.case = TRUE))  # This removes all rows where 'Gene.intra' contains '16s'
+
+
+# Define minimum y-axis value for log scale display
+bar_min <- 1e-5
+
+dataratio_summary <- dataratio_filtered %>%
+  group_by(Gene.intra, Source.extra) %>%
+  dplyr::summarise(
+    mean_ratio_ei = mean(ratio.ei, na.rm = TRUE),
+    se_ratio_ei = sd(ratio.ei, na.rm = TRUE) / sqrt(n())
+  )
+
+###
+dataratio_summary <- dataratio_summary %>%
+  mutate(mean_ratio_ei = mean_ratio_ei + 1e-6)  # Adjust this constant if needed
+
+# Reorder the factor levels of Gene.weak
+dataratio_summary$Gene.intra <- factor(dataratio_summary$Gene.intra, 
+                                   levels = c("intI1", "intI2", "intI3", "ermB", "sul1", "tet33", "tetG", "tetM", "tetX"))
+
+# Create the plot using geom_rect for the bars
+plot_ratio_ei_bar <- ggplot(dataratio_summary, aes(fill = Source.extra)) +
+  theme_bw() +
+  geom_rect(aes(
+    xmin = as.numeric(Gene.intra) - 0.4,  # Left edge of the bar
+    xmax = as.numeric(Gene.intra) + 0.4,  # Right edge of the bar
+    ymin = bar_min,                      # Starting baseline for the bar
+    ymax = mean_ratio_ei                 # Height of the bar based on abundance
+  ), position = position_dodge(width = 0.8)) +  # Dodge for grouped bars
+  geom_errorbar(aes(
+    x = as.numeric(Gene.intra),  # Center error bars at each Gene position
+    ymin = pmax(mean_ratio_ei - se_ratio_ei, 1e-6), 
+    ymax = mean_ratio_ei + se_ratio_ei
+  ), width = 0.2, position = position_dodge(width = 0.8)) +  # Error bars
+  scale_fill_manual(values = c("Fresh" = "#F4A9A3", "Pit" = "#73ECF5")) +
+  scale_y_log10(
+    limits = c(1e-5, 1e2),  # Adjust limits to cover your data range
+    breaks = 10^seq(-5, 1, by = 1),
+    labels = scales::trans_format("log10", scales::math_format(10^.x))
+  ) +
+  scale_x_continuous(
+    breaks = 1:length(levels(dataratio_summary$Gene.intra)),
+    labels = levels(dataratio_summary$Gene.intra)
+  ) +
+  labs(x = "ARGs and MGEs", y = "exDNA/iDNA, log10", title = "Ratio of exDNA to iDNA", fill = "Manure Type") +
+  theme(
+    panel.background = element_rect(fill = "transparent"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.text.x = element_text(face = "italic"),
+    strip.text = element_text(face = "italic")
+  )
+
+# Print the plot
+print(plot_ratio_ei_bar)
+
+# Save the plot
+ggsave("plot_ratio_ei_bar.png", plot = plot_ratio_ei_bar, width = 7, height = 4)
+```
+
+```{free to bound DNA ratio}
+
+#free weeakly tightly
+
+data_free_dataARG_no_intracellular <- filter(dataARG_no_intracellular, Type == "Free")
+data_weak_dataARG_no_intracellular <- filter(dataARG_no_intracellular, Type == "Weakly bound")
+data_tight_dataARG_no_intracellular <- filter(dataARG_no_intracellular, Type == "Tightly bound")
+
+# Calculate mean and SE for ratio.ei grouped by Gene and Source.tight
+merged_summary <- merged_free_bound_dataARG_no_intracellular %>%
+  group_by(Gene.weak, Source.tight) %>%
+  dplyr::summarise(
+    merged_mean_ratio_ei = mean(ratio_free_combined, na.rm = TRUE),
+    merged_se_ratio_ei = sd(ratio_free_combined, na.rm = TRUE) / sqrt(n())
+  )
+
+
+###
+merged_summary <- merged_summary %>%
+  mutate(merged_mean_ratio_ei = merged_mean_ratio_ei + 1e-6)  # Adjust this constant if needed
+
+
+# Reorder the factor levels of Gene.weak
+merged_summary$Gene.weak <- factor(merged_summary$Gene.weak, 
+                                   levels = c("intI1", "intI2", "intI3", "ermB", "sul1", "tet33", "tetG", "tetM", "tetX"))
+
+# Create the plot using geom_rect for the bars
+plot_merged_ratio_ei_bar <- ggplot(merged_summary, aes(fill = Source.tight)) +
+  theme_bw() +
+  geom_rect(aes(
+    xmin = as.numeric(Gene.weak) - 0.4,  # Left edge of the bar
+    xmax = as.numeric(Gene.weak) + 0.4,  # Right edge of the bar
+    ymin = bar_min,                      # Starting baseline for the bar
+    ymax = merged_mean_ratio_ei                 # Height of the bar based on abundance
+  ), position = position_dodge(width = 0.8)) +  # Dodge for grouped bars
+  geom_errorbar(aes(
+    x = as.numeric(Gene.weak),  # Center error bars at each Gene position
+    ymin = pmax(merged_mean_ratio_ei - merged_se_ratio_ei, 1e-6), 
+    ymax = merged_mean_ratio_ei + merged_se_ratio_ei
+  ), width = 0.2, position = position_dodge(width = 0.8)) +  # Error bars
+  scale_fill_manual(values = c("Fresh" = "#F4A9A3", "Pit" = "#73ECF5")) +
+  scale_y_log10(
+    limits = c(1e-5, 1e2),  # Adjust limits to cover your data range
+    breaks = 10^seq(-5, 1, by = 1),
+    labels = scales::trans_format("log10", scales::math_format(10^.x))
+  ) +
+  scale_x_continuous(
+    breaks = 1:length(levels(merged_summary$Gene.weak)),
+    labels = levels(merged_summary$Gene.weak)
+  ) +
+  labs(x = "ARGs and MGEs", y = "Free DNA/Bound DNA, log10", title = "Ratio of Free to Bound DNA", fill = "Manure Type") +
+  theme(
+    panel.background = element_rect(fill = "transparent"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.text.x = element_text(face = "italic"),
+    strip.text = element_text(face = "italic")
+  )
+
+# Print the plot
+print(plot_merged_ratio_ei_bar)
+
+# Save the plot
+ggsave("plot_merged_ratio_ei_bar.png", plot = plot_merged_ratio_ei_bar, width = 7, height = 4)
+
+```
+
+```{STATISTICS, Fresh Absolute abundance}
+####IMPORTANT
+# Remove leading and trailing spaces
+data_Fresh$Gene <- trimws(data_Fresh$Gene)
+
+# Check unique gene names again
+gene_names <- unique(data_Fresh$Gene)
+print(gene_names)
+
+
+#STAT ON ABSOLUTE ABUNDNACE
+# List of unique gene names
+gene_names <- unique(data_Fresh$Gene)
+
+# Loop through each gene to check normality and perform the appropriate test
+results <- lapply(gene_names, function(gene) {
+  # Filter data for the current gene and split by Location.of.DNA
+  gene_data <- data_Fresh %>% filter(Gene == gene)
+  exDNA_data <- gene_data %>% filter(Location.of.DNA == "exDNA") %>% pull(log_copies)
+  iDNA_data <- gene_data %>% filter(Location.of.DNA == "iDNA") %>% pull(log_copies)
+  
+  # Perform Shapiro-Wilk test for normality
+  shapiro_exDNA <- shapiro.test(exDNA_data)
+  shapiro_iDNA <- shapiro.test(iDNA_data)
+  
+  # Choose test based on normality results
+  if (shapiro_exDNA$p.value > 0.05 && shapiro_iDNA$p.value > 0.05) {
+    # If both groups are normally distributed, use t-test
+    test <- t.test(exDNA_data, iDNA_data, var.equal = FALSE)  # Welch's t-test
+    test_type <- "t-test (Welch)"
+    p_value <- test$p.value
+    statistic <- test$statistic
+  } else {
+    # If either group is not normal, use Mann-Whitney U test
+    test <- wilcox.test(exDNA_data, iDNA_data)
+    test_type <- "Mann-Whitney U test"
+    p_value <- test$p.value
+    statistic <- test$statistic
+  }
+  
+  # Store results in a data frame
+  data.frame(
+    Gene = gene,
+    Test_Type = test_type,
+    Statistic = statistic,
+    P_Value = p_value,
+    Shapiro_exDNA_P = shapiro_exDNA$p.value,
+    Shapiro_iDNA_P = shapiro_iDNA$p.value
+  )
+})
+
+# Combine results into a single data frame
+results <- do.call(rbind, results)
+
+
+# View results
+print(results)
+
+```
+
+
+```{Pit, absolute abundance}
+
+# List of unique gene names
+gene_names_pit <- unique(data_Pit$Gene)
+
+# Loop through each gene to check normality and perform the appropriate test
+results_pit <- lapply(gene_names_pit, function(gene) {
+  # Filter data for the current gene and split by Location.of.DNA (exDNA and iDNA)
+  gene_data_pit <- data_Pit %>% filter(Gene == gene)
+  exDNA_data_pit <- gene_data_pit %>% filter(Location.of.DNA == "exDNA") %>% pull(log_copies)
+  iDNA_data_pit <- gene_data_pit %>% filter(Location.of.DNA == "iDNA") %>% pull(log_copies)
+  
+  # Perform Shapiro-Wilk test for normality
+  shapiro_exDNA_pit <- shapiro.test(exDNA_data_pit)
+  shapiro_iDNA_pit <- shapiro.test(iDNA_data_pit)
+  
+  # Choose test based on normality results
+  if (shapiro_exDNA_pit$p.value > 0.05 && shapiro_iDNA_pit$p.value > 0.05) {
+    # If both groups are normally distributed, use t-test
+    test_pit <- t.test(exDNA_data_pit, iDNA_data_pit, var.equal = FALSE)  # Welch's t-test
+    test_type_pit <- "t-test (Welch)"
+    p_value_pit <- test_pit$p.value
+    statistic_pit <- test_pit$statistic
+  } else {
+    # If either group is not normal, use Mann-Whitney U test
+    test_pit <- wilcox.test(exDNA_data_pit, iDNA_data_pit)
+    test_type_pit <- "Mann-Whitney U test"
+    p_value_pit <- test_pit$p.value
+    statistic_pit <- test_pit$statistic
+  }
+  
+  # Store results in a data frame, ensuring numeric columns are as.numeric
+  data.frame(
+    Gene = gene,
+    Test_Type = test_type_pit,
+    Statistic = as.numeric(statistic_pit),
+    P_Value = as.numeric(p_value_pit),
+    Shapiro_exDNA_P = as.numeric(shapiro_exDNA_pit$p.value),
+    Shapiro_iDNA_P = as.numeric(shapiro_iDNA_pit$p.value)
+  )
+})
+
+# Combine results into a single data frame
+results_pit_final <- do.call(rbind, results_pit)
+
+# View results
+print(results_pit_final)
+
+
+```
+
+
+```{r, ratio of free to bound}
+
+# List of unique gene names
+gene_names_ratio <- unique(dataratio_filtered$Gene.extra)
+
+# Loop through each gene to check normality and perform the appropriate test
+results_ratio_analysis <- lapply(gene_names_ratio, function(gene) {
+  # Filter data for the current gene and split by Source.extra (e.g., Fresh, Pit)
+  gene_data <- dataratio_filtered %>% filter(Gene.extra == gene)
+  fresh_data <- gene_data %>% filter(Source.extra == "Fresh") %>% pull(ratio.ei)
+  pit_data <- gene_data %>% filter(Source.extra == "Pit") %>% pull(ratio.ei)
+  
+  # Perform Shapiro-Wilk test for normality
+  shapiro_fresh <- shapiro.test(fresh_data)
+  shapiro_pit <- shapiro.test(pit_data)
+  
+  # Choose test based on normality results
+  if (shapiro_fresh$p.value > 0.05 && shapiro_pit$p.value > 0.05) {
+    # If both groups are normally distributed, use t-test
+    test_ratio <- t.test(fresh_data, pit_data, var.equal = FALSE)  # Welch's t-test
+    test_type <- "t-test (Welch) on Ratio.ei"
+    p_value <- test_ratio$p.value
+    statistic <- test_ratio$statistic
+  } else {
+    # If either group is not normal, use Mann-Whitney U test
+    test_ratio <- wilcox.test(fresh_data, pit_data)
+    test_type <- "Mann-Whitney U test on Ratio.ei"
+    p_value <- test_ratio$p.value
+    statistic <- test_ratio$statistic
+  }
+  
+  # Store results in a data frame, ensuring numeric columns are as.numeric
+  data.frame(
+    Gene = gene,
+    Test_Type = test_type,
+    Statistic = as.numeric(statistic),
+    P_Value = as.numeric(p_value),
+    Shapiro_Fresh_P = as.numeric(shapiro_fresh$p.value),
+    Shapiro_Pit_P = as.numeric(shapiro_pit$p.value)
+  )
+})
+
+# Combine results into a single data frame
+results_ratio_final <- do.call(rbind, results_ratio_analysis)
+
+# View results
+print(results_ratio_final)
+
+
+# Apply BH correction for multiple comparisons on the p-values
+results_ratio_final$p_adj <- p.adjust(results_ratio_final$P_Value, method = "BH")
+
+# View results with adjusted p-values
+print(results_ratio_final)
+```
+
+
+```{r, ratio of exDNA to iDNA}
+
+
+# List of unique gene names
+gene_names_ratio <- unique(dataratio_filtered$Gene.extra)
+
+# Loop through each gene to check normality and perform the appropriate test
+results_ratio_analysis <- lapply(gene_names_ratio, function(gene) {
+  # Filter data for the current gene and split by Source.extra (e.g., Fresh, Pit)
+  gene_data <- dataratio_filtered %>% filter(Gene.extra == gene)
+  fresh_data <- gene_data %>% filter(Source.extra == "Fresh") %>% pull(ratio.ei)
+  pit_data <- gene_data %>% filter(Source.extra == "Pit") %>% pull(ratio.ei)
+  
+  # Perform Shapiro-Wilk test for normality
+  shapiro_fresh <- shapiro.test(fresh_data)
+  shapiro_pit <- shapiro.test(pit_data)
+  
+  # Choose test based on normality results
+  if (shapiro_fresh$p.value > 0.05 && shapiro_pit$p.value > 0.05) {
+    # If both groups are normally distributed, use t-test
+    test_ratio <- t.test(fresh_data, pit_data, var.equal = FALSE)  # Welch's t-test
+    test_type <- "t-test (Welch) on Ratio.ei"
+    p_value <- test_ratio$p.value
+    statistic <- test_ratio$statistic
+  } else {
+    # If either group is not normal, use Mann-Whitney U test
+    test_ratio <- wilcox.test(fresh_data, pit_data)
+    test_type <- "Mann-Whitney U test on Ratio.ei"
+    p_value <- test_ratio$p.value
+    statistic <- test_ratio$statistic
+  }
+  
+  # Store results in a data frame, ensuring numeric columns are as.numeric
+  data.frame(
+    Gene = gene,
+    Test_Type = test_type,
+    Statistic = as.numeric(statistic),
+    P_Value = as.numeric(p_value),
+    Shapiro_Fresh_P = as.numeric(shapiro_fresh$p.value),
+    Shapiro_Pit_P = as.numeric(shapiro_pit$p.value)
+  )
+})
+
+# Combine results into a single data frame
+results_ratio_final <- do.call(rbind, results_ratio_analysis)
+
+# View results
+print(results_ratio_final)
+
+
+# Apply BH correction for multiple comparisons on the p-values
+results_ratio_final$p_adj <- p.adjust(results_ratio_final$P_Value, method = "BH")
+
+# View results with adjusted p-values
+print(results_ratio_final)
+
+```
+

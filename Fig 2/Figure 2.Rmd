@@ -1,0 +1,223 @@
+
+
+```{r setup, include=FALSE}
+# Load necessary libraries
+library(RColorBrewer)
+
+# Load your data
+data <- read.csv("/Users/sakib/Desktop/exDNA prevalance/Corelation/Pit_Fresh_Extra.csv", header=TRUE, sep=",")
+
+# Reorder the columns to match the desired order
+desired_order <- c("intI1", "intI2", "intI3", "ermB", "sul1", "tetM", "tet33", "tetG", "tetX")
+data <- data[, desired_order]
+
+# Compute Kendall's tau correlation matrix
+cor_matrix_kendall <- cor(data, method = "kendall")
+
+# Function to compute Kendall's tau p-value
+kendall_pvalue <- function(x, y) {
+  test <- cor.test(x, y, method = "kendall")
+  return(test$p.value)
+}
+
+# Compute p-value matrix
+p_matrix_kendall <- outer(colnames(data), colnames(data), Vectorize(function(x, y) {
+  kendall_pvalue(data[[x]], data[[y]])
+}))
+
+# Create significance markers with different levels
+add_significance <- function(pmat) {
+  significance <- matrix("", nrow = nrow(pmat), ncol = ncol(pmat))
+  significance[pmat < 0.05 & pmat >= 0.01] <- "*"
+  significance[pmat < 0.01 & pmat >= 0.001] <- "**"
+  significance[pmat < 0.001] <- "***"
+  return(significance)
+}
+
+# Compute significance markers
+significance_matrix_kendall <- add_significance(p_matrix_kendall)
+
+# Define a color palette from 0.4 to 1
+color_palette <- colorRampPalette(c("#ffffbf", "#fdae61", "#d73027"))(100)
+
+# Custom function to plot heatmap
+plot_custom_heatmap <- function(cor_matrix, significance_matrix, color_palette) {
+  # Set up the plot
+  png(filename = "/Users/sakib/Desktop/eDNA_Gene_Correlations_Colored.png", width = 1000, height = 1000, res = 120)
+  par(mar = c(5, 5, 4, 2) + 0.1)
+  
+  # Create a blank plot with gridlines for all areas
+  plot(1, type = "n", xlim = c(0.5, ncol(cor_matrix) + 0.5), 
+       ylim = c(0.5, nrow(cor_matrix) + 0.5), xlab = "", ylab = "", 
+       xaxs = "i", yaxs = "i", axes = FALSE)
+  
+  # Add colored rectangles for correlations
+  for (i in 1:nrow(cor_matrix)) {
+    for (j in 1:ncol(cor_matrix)) {
+      if (i > j) {  # Lower triangle
+        cor_value <- cor_matrix[i, j]
+        if (!is.na(cor_value)) {
+          color_index <- round((cor_value - 0.4) / 0.6 * 99) + 1
+          color_index <- max(1, min(color_index, 100))  # Ensure index is within bounds
+          rect(j - 0.5, i - 0.5, j + 0.5, i + 0.5, col = color_palette[color_index], border = NA)
+        }
+      } else { # Blank areas in upper triangle and diagonal
+        rect(j - 0.5, i - 0.5, j + 0.5, i + 0.5, col = "#F0F0F0", border = NA) # Light gray for blank areas
+      }
+    }
+  }
+  
+  # Add grid lines for all boxes
+  grid(nx = ncol(cor_matrix), ny = nrow(cor_matrix), col = "lightgray", lty = "solid")
+  
+  # Add correlation values and significance markers
+  for (i in 1:nrow(cor_matrix)) {
+    for (j in 1:ncol(cor_matrix)) {
+      if (i > j) { # Lower triangle
+        cor_value <- cor_matrix[i, j]
+        if (!is.na(cor_value)) {
+          text(j, i, sprintf("%.2f", cor_value), cex = 0.7)
+          if (significance_matrix[i, j] != "") {
+            text(j, i - 0.3, significance_matrix[i, j], cex = 1.5, col = "black")
+          }
+        }
+      }
+    }
+  }
+  
+  # Add axis labels with italic font style
+  axis(1, at = seq(1, ncol(cor_matrix)), labels = parse(text=paste("italic('", colnames(cor_matrix), "')")), las = 2, cex.axis = 0.9)
+  
+   axis(2, at = seq(1, nrow(cor_matrix)), labels = parse(text=paste("italic('", rownames(cor_matrix), "')")), las = 2, cex.axis = 0.9)
+
+  
+   # Add title
+   title("Heat-map of eARGs and eMGEs", cex.main = 1.2)
+   
+   # Add color legend
+   legend_colors <- color_palette[seq(1, length(color_palette), length.out = 5)]
+   legend_values <- seq(0.4, 1, length.out = 5)
+   legend("right", legend = sprintf("%.2f", legend_values), 
+          fill = legend_colors, title = "Correlation", cex = 0.7)
+   
+   dev.off()
+}
+
+# Call the custom function to create the heatmap
+plot_custom_heatmap(cor_matrix_kendall, significance_matrix_kendall, color_palette)
+```
+
+
+```{r setup, include=FALSE}
+# Load necessary libraries
+library(RColorBrewer)
+
+# Load your data
+data2 <- read.csv("/Users/sakib/Desktop/exDNA prevalance/Corelation/Pit_Fresh_Intra.csv", header=TRUE, sep=",")
+
+# Reorder the columns to match the desired order
+desired_order <- c("intI1", "intI2", "intI3", "ermB", "sul1", "tetM", "tet33", "tetG", "tetX")
+data2 <- data2[, desired_order]
+
+# Compute Kendall's tau correlation matrix
+cor_matrix_kendall2 <- cor(data2, method = "kendall")
+
+# Mask the upper triangle by setting it to NA
+cor_matrix_kendall2[upper.tri(cor_matrix_kendall2)] <- NA
+
+# Function to compute Kendall's tau p-value
+kendall_pvalue <- function(x, y) {
+  test <- cor.test(x, y, method = "kendall")
+  return(test$p.value)
+}
+
+# Compute p-value matrix
+p_matrix_kendall2 <- outer(colnames(data2), colnames(data2), Vectorize(function(x, y) {
+  kendall_pvalue(data2[[x]], data2[[y]])
+}))
+
+# Mask the upper triangle in the p-value matrix as well
+p_matrix_kendall2[upper.tri(p_matrix_kendall2)] <- NA
+
+# Create significance markers with different levels
+add_significance <- function(pmat) {
+  significance <- matrix("", nrow = nrow(pmat), ncol = ncol(pmat))  # Initialize matrix with empty strings
+  significance[pmat < 0.05 & pmat >= 0.01] <- "*"   # p < 0.05
+  significance[pmat < 0.01 & pmat >= 0.001] <- "**" # p < 0.01
+  significance[pmat < 0.001] <- "***"               # p < 0.001
+  significance[upper.tri(significance)] <- ""       # Set upper triangle to empty
+  return(significance)
+}
+
+# Compute significance markers for the lower triangle only
+significance_matrix_kendall2 <- add_significance(p_matrix_kendall2)
+
+# Define the color palette used for eDNA (very light yellow to yellow to red)
+color_palette <- colorRampPalette(c("#ffffbf", "#fdae61", "#d73027"))(100)
+
+# Custom function to plot heatmap
+plot_custom_heatmap <- function(cor_matrix, significance_matrix, color_palette) {
+  # Set up the plot
+  png(filename = "/Users/sakib/Desktop/iDNA_Gene_Correlations_Colored.png", width = 1000, height = 1000, res = 120)
+  par(mar = c(5, 5, 4, 2) + 0.1)
+  
+  # Create a blank plot with gridlines for all areas
+  plot(1, type = "n", xlim = c(0.5, ncol(cor_matrix) + 0.5), 
+       ylim = c(0.5, nrow(cor_matrix) + 0.5), xlab = "", ylab = "", 
+       xaxs = "i", yaxs = "i", axes = FALSE)
+  
+  # Add colored rectangles for correlations
+  for (i in 1:nrow(cor_matrix)) {
+    for (j in 1:ncol(cor_matrix)) {
+      if (i > j) {  # Lower triangle
+        cor_value <- cor_matrix[i, j]
+        if (!is.na(cor_value)) {
+          color_index <- round((cor_value - 0.4) / 0.6 * 99) + 1
+          color_index <- max(1, min(color_index, 100))  # Ensure index is within bounds
+          rect(j - 0.5, i - 0.5, j + 0.5, i + 0.5, col = color_palette[color_index], border = NA)
+        }
+      } else { # Blank areas in upper triangle and diagonal
+        rect(j - 0.5, i - 0.5, j + 0.5, i + 0.5, col = "#F0F0F0", border = NA) # Light gray for blank areas
+      }
+    }
+  }
+  
+  # Add grid lines for all boxes
+  grid(nx = ncol(cor_matrix), ny = nrow(cor_matrix), col = "#E0E0E0", lty = "solid")
+  
+  # Add correlation values and significance markers
+  for (i in 1:nrow(cor_matrix)) {
+    for (j in 1:ncol(cor_matrix)) {
+      if (i > j) { # Lower triangle
+        cor_value <- cor_matrix[i, j]
+        if (!is.na(cor_value)) {
+          text(j, i, sprintf("%.2f", cor_value), cex = 0.7) # Adjusted size for correlation values
+          if (significance_matrix[i, j] != "") {
+            text(j, i - 0.3, significance_matrix[i, j], cex = 1.5, col = "black") # Larger size for significance markers
+          }
+        }
+      }
+    }
+  }
+  
+  # Add axis labels with italic font style and increased size
+  axis(1, at = seq(1, ncol(cor_matrix)), labels = parse(text=paste("italic('", colnames(cor_matrix), "')")), las = 2, cex.axis = 0.9) # Increased label size
+  axis(2, at = seq(1, nrow(cor_matrix)), labels = parse(text=paste("italic('", rownames(cor_matrix), "')")), las = 2, cex.axis = 0.9) # Increased label size
+  
+  # Add title with increased font size
+  title("Heat-map of iARGs and iMGEs", cex.main = 1.2)
+  
+  # Add color legend
+  legend_colors <- color_palette[seq(1, length(color_palette), length.out = 5)]
+  legend_values <- seq(0.4, 1, length.out = 5)
+  legend("right", legend = sprintf("%.2f", legend_values), 
+         fill = legend_colors, title = "Correlation", cex = 0.7)
+  
+  dev.off()
+}
+
+# Call the custom function to create the heatmap
+plot_custom_heatmap(cor_matrix_kendall2, significance_matrix_kendall2, color_palette)
+
+```
+

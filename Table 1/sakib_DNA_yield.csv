@@ -1,0 +1,25 @@
+﻿Manure Type,DNA type,exDNA type ,Replicate,yield_ug_g
+Pit,exDNA,Free,1,2.0375
+Pit,exDNA,Free,2,2.8125
+Pit,exDNA,Free,3,1.3
+Pit,exDNA,weakly bound,1,1.0375
+Pit,exDNA,weakly bound,2,0.7625
+Pit,exDNA,weakly bound,3,0.7875
+Pit,exDNA,tightly bound,1,1.3375
+Pit,exDNA,tightly bound,2,0.85
+Pit,exDNA,tightly bound,3,0.85
+Pit,iDNA,N/A,1,32.125
+Pit,iDNA,N/A,2,23.875
+Pit,iDNA,N/A,3,28.775
+Fresh,exDNA,Free,1,2.6375
+Fresh,exDNA,Free,2,2.5625
+Fresh,exDNA,Free,3,6.3875
+Fresh,exDNA,weakly bound,1,10.4125
+Fresh,exDNA,weakly bound,2,3.9875
+Fresh,exDNA,weakly bound,3,9.5
+Fresh,exDNA,tightly bound,1,1.6625
+Fresh,exDNA,tightly bound,2,2.3625
+Fresh,exDNA,tightly bound,3,1.8375
+Fresh,iDNA,N/A,1,64.75
+Fresh,iDNA,N/A,2,68.325
+Fresh,iDNA,N/A,3,55.75

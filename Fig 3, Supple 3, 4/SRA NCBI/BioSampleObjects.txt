@@ -1,0 +1,13 @@
+Accession	Sample Name	SPUID	Organism	Tax ID	
+SAMN53084715	F_exDNA_1	F_exDNA_1	manure metagenome	1792145	
+SAMN53084716	F_exDNA_2	F_exDNA_2	manure metagenome	1792145	
+SAMN53084717	F_exDNA_3	F_exDNA_3	manure metagenome	1792145	
+SAMN53084718	P_exDNA_1	P_exDNA_1	manure metagenome	1792145	
+SAMN53084719	P_exDNA_2	P_exDNA_2	manure metagenome	1792145	
+SAMN53084720	P_exDNA_3	P_exDNA_3	manure metagenome	1792145	
+SAMN53084721	F_iDNA_1	F_iDNA_1	manure metagenome	1792145	
+SAMN53084722	F_iDNA_2	F_iDNA_2	manure metagenome	1792145	
+SAMN53084723	F_iDNA_3	F_iDNA_3	manure metagenome	1792145	
+SAMN53084724	P_iDNA_1	P_iDNA_1	manure metagenome	1792145	
+SAMN53084725	P_iDNA_2	P_iDNA_2	manure metagenome	1792145	
+SAMN53084726	P_iDNA_3	P_iDNA_3	manure metagenome	1792145	

@@ -1,0 +1,15 @@
+NIH_NCBI
+https://www.ncbi.nlm.nih.gov/bioproject/PRJNA1357369
+
+Accession: PRJNA1357369 ID: 1357369
+exDNA in dairy pit-stored manure
+
+Dairy manure analysis reveals significant risk of Antibiotic resistance from Extracellular DNA in Manure storage Pit
+Accession	PRJNA1357369
+Data Type	Raw sequence reads
+Scope	Multispecies
+Grants	
+"AFRI food safety grant" (Grant ID 2021-68015-33495, USDA National Institute of Food and Agriculture)
+Submission	Registration date: 5-Nov-2025
+Iowa State University
+Relevance	Agricultural
